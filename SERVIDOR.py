@@ -1,23 +1,47 @@
 import socket
 import threading
-import json
+import sqlite3
 import tkinter as tk
 
 def cadastro(numero, nome):
     if( ehValido(numero) and nome!= None):
         adicionarCtt(numero, nome)
 
-def adicionarCtt(numero, nome):
-    dados = {
-        "numero": numero,
-        "nome": nome
-    }
-    arquivo = open("cadastro.json", "w")
-    json.dump(dados, arquivo)
-    arquivo.close()
+def enviarMsgBroadCast(cursor, remetente, mensagem):
+    cursor.execute("INSERT INTO mensagens (remetente_id, destinatario_id, conteudo) VALUES (?, NULL, '?');", (remetente, None, mensagem))
 
+def adicionarCtt(cursor, numero, nome):
+    cursor.execute("INSERT INTO clientes (numero, nome) VALUES (?, ?);", (numero, nome))
 
+def criar_banco(cursor):
+    cursor.execute('''
+        CREATE TABLE clientes (
+            id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
+            numero VARCHAR(20) UNIQUE NOT NULL,
+            nome VARCHAR(100) NOT NULL
+        );
+    ''')
+    cursor.execute('''
+        CREATE TABLE mensagens (
+            id_mensagem INTEGER PRIMARY KEY AUTOINCREMENT,
+            remetente_id INTEGER NOT NULL,
+            destinatario_id INTEGER NULL, -- NULL para mensagens em grupo/broadcast
+            conteudo TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            editada BOOLEAN DEFAULT FALSE,
+            FOREIGN KEY (remetente_id) REFERENCES clientes(id_cliente),
+            FOREIGN KEY (destinatario_id) REFERENCES clientes(id_cliente)
+        );
+    ''')
 
+def enviarMsg(cursor, remetente, destinatario, mensagem):
+    cursor.execute("INSERT INTO mensagens (remetente_id, destinatario_id, conteudo) VALUES (?, ?, '?');", (remetente, destinatario, mensagem))
+
+def apagarMsg(cursor, idMsg):
+    cursor.execute("DELETE FROM mensagens WHERE id_mensagem = ?;", (idMsg))
+
+def editarMsg(cursor, idMsg, novaMsg):
+    cursor.execute("UPDATE mensagens SET conteudo = '[NOVO_CONTEUDO]', editada = TRUE WHERE id_mensagem = [ID_DA_MENSAGEM];", (novaMsg, idMsg))
 
 def handle_client(conexao, cliente):
     """
@@ -45,9 +69,17 @@ def handle_client(conexao, cliente):
 
 
 def main():
-    adicionarCtt("31971902735","Caio")
+    conn = sqlite3.connect('meu_banco.db')
+    cursor = conn.cursor()
 
+    #adicionarCtt(cursor, "31975839566","Alice")
+    cursor.execute("SELECT * FROM clientes;")
+    clientes = cursor.fetchall()
+    print("Clientes cadastrados:")
+    for cliente in clientes:
+        print(cliente)
 
+"""
     # Cria a janela principal
     janela = tk.Tk()
     janela.title("Exemplo Tkinter")
@@ -59,7 +91,7 @@ def main():
     # Inicia o loop principal da interface gráfica
     janela.mainloop()
     
-"""
+
     host = '127.0.0.1'  # Endereço IP do Servidor (localhost)
     porta = 5000        # Porta que o Servidor está ouvindo
     # Cria o soquete do servidor
@@ -87,8 +119,7 @@ def main():
         # Fecha o soquete principal do servidor
         print("FECHANDO SOQUETE DO SERVIDOR.")
         soquete.close()
-"""
-        
+"""    
         
 # Bloco que garante que a função main() seja executada quando o script for rodado
 if __name__ == "__main__":
